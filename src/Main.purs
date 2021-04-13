@@ -1,4 +1,4 @@
-module ProtobufDecode where
+module Main where
 
 import Prelude
 
