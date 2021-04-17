@@ -3,19 +3,19 @@
   "version": "1.0.0",
   "description": "Web page which decodes and explains pasted binary Protocol Buffers",
   "main": "bundle.js",
-  "dependencies": {
-    "long": "^4.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "html-webpack-plugin": "^5.3.1",
+    "long": "^4.0.0",
     "purescript-psa": "^0.8.2",
     "purs-loader": "^3.7.2",
-    "webpack": "^5.32.0",
+    "webpack": "^5.33.2",
     "webpack-cli": "^4.6.0",
     "webpack-dev-server": "^3.11.2"
   },
   "scripts": {
-    "webpack:server": "webpack-dev-server --progress --inline --hot"
+    "webpack:server": "webpack serve --progress --inline --hot",
+    "webpack": "webpack --help"
   },
   "repository": {
     "type": "git",
