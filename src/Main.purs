@@ -4,12 +4,17 @@ import Prelude
 
 import Data.Array (many)
 import Data.ArrayBuffer.ArrayBuffer (empty)
+import Data.ArrayBuffer.ArrayBuffer as AB
+import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray, toArray, whole)
-import Data.ArrayBuffer.Types (ArrayBuffer, Uint8ClampedArray)
+import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray)
 import Data.Either (Either(..))
+import Data.Long.Internal as Long
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as Char
+import Data.Tuple (Tuple(..))
 import Data.UInt (UInt, fromInt)
+import Data.UInt as UInt
 import Data.Unfoldable (replicateA)
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -19,8 +24,12 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import Text.Parsing.Parser (ParseError(..), Parser, ParserT, fail, runParser)
+import Protobuf.Common (Bytes(..), WireType(..))
+import Protobuf.Decode as Decode
+import Protobuf.Runtime (UnknownField(..), parseFieldUnknown)
+import Text.Parsing.Parser (ParseError(..), Parser, ParserT, fail, runParser, runParserT)
 import Text.Parsing.Parser.Combinators (choice)
+import Text.Parsing.Parser.DataView (takeN)
 import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (anyChar, string)
 import Text.Parsing.Parser.Token (digit, octDigit)
@@ -95,9 +104,11 @@ handleAction = case _ of
     valueParsed = case fromOctString of
       Left (ParseError message position) -> "Parse error " <> message <> show position
       Right xs ->
-        let xs' = unsafePerformEffect $ toArray =<< (whole xs :: Effect Uint8ClampedArray) :: Array UInt
-        in
-        show xs'
+        -- let xs' = unsafePerformEffect $ toArray =<< (whole xs :: Effect Uint8ClampedArray) :: Array UInt
+        -- in
+        -- show xs'
+        show $ unsafePerformEffect $ runParserT (DV.whole xs) parseProtobuf
+
 
     -- Inverse of ToOctString
     -- https://github.com/protocolbuffers/protobuf/blob/ab5b61bf2f0fb1ac485be1b82fffca153c2509ed/conformance/conformance_test.cc#L57
@@ -151,3 +162,19 @@ handleAction = case _ of
         '6' -> pure 6
         '7' -> pure 7
         x   -> fail $ "Expecting octal digit but got " <> Char.singleton x
+
+    parseProtobuf :: ParserT DataView Effect (Array UnknownField)
+    parseProtobuf = many do
+      Tuple fieldNumber wireType <- Decode.tag32
+      -- parseFieldUnknown (UInt.toInt fieldNumber) wireType
+      case wireType of
+        VarInt ->  UnknownVarInt fieldNumber <$> Decode.uint64
+        Bits64 -> UnknownBits64 fieldNumber <$> Decode.fixed64
+        LenDel -> do
+          len <- Long.toInt <$> Decode.varint64
+          case len of
+            Nothing -> fail "Length-delimited value of unknown field was too long."
+            Just l -> do
+              dv <- takeN l
+              pure $ UnknownLenDel fieldNumber $ Bytes $ AB.slice (DV.byteOffset dv) (DV.byteLength dv) (DV.buffer dv)
+        Bits32 -> UnknownBits32 fieldNumber <$> Decode.fixed32
