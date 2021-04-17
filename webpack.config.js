@@ -76,7 +76,7 @@ module.exports = {
     }),
     new HtmlWebpackPlugin({
       title: 'purescript-webpack-example',
-      template: 'index.html',
+      template: './src/index.html',
       inject: false  // See stackoverflow.com/a/38292765/3067181
     })
   ].concat(plugins)
