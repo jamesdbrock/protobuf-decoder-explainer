@@ -5,6 +5,7 @@
   [ "parsing"
   , "protobuf"
   , "halogen"
+  , "unicode"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs" ]
