@@ -2,10 +2,111 @@
 <html lang="en" data-framework="purescript">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <style content="text/css">
+  body {
+    font-family:sans-serif;
+  }
+  /*
+  @media (prefers-color-scheme: light) {
+    body {
+      color: #333333;
+      background-color: white;
+    }
+    table.messagetable {
+      border-color: #c7c7c7;
+      border-radius: 3px;
+      box-shadow: 0px 5px 10px -1px #a5a5a5;
+      background-color: #eeeeee;
+    }
+  }
+  @media (prefers-color-scheme: dark) {
+    body {
+      color: #aaaaaa;
+      background-color: black;
+    }
+  }
+  */
+  table.messagetable {
+    margin-left: auto;
+    margin-right: auto;
+    border-style: solid;
+    border-color: #c7c7c7;
+    border-radius: 3px;
+    box-shadow: 0px 5px 10px -1px #a5a5a5;
+    background-color: #eeeeee;
+  }
+  table.messagetable > tbody {
+  }
+  pre {
+    white-space: pre-wrap;
+  }
+  input {
+    width: 100%;
+    font-family: monospace, monospace;
+    font-size: 1em;
+    font-weight: bold;
+    margin-bottom: 1em;
+  }
+  div.dataview {
+    display: flex;
+    flex-direction: column;
+    font-family: monospace, monospace;
+  }
+  div.dataview > div {
+    font-size: 50%;
+    text-align: right;
+  }
+  table.messagetable > tbody > tr > td {
+    background-color: white;
+    border-radius: 3px;
+    vertical-align: top;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  td.bytes {
+  }
+  td.fnum {
+    text-align: right;
+    font-weight: bold;
+  }
+  td.ftype {
+  }
+  td.fval {
+    text-align: right;
+  }
+  code {
+  font-family: monospace, monospace;
+  font-size: 1em;
+  font-weight: bold;
+  }
+  </style>
 </head>
 
 <body>
-  <div id="app"></div>
-  <script src="./bundle.js"></script>
+  <p>Paste a Google Protocol Buffers byte array into the input box, and this page will explain the structure of the byte array.</p>
+  <p>The format of the byte array should be backslash-escaped octal characters, which is the format produced by the
+    <a href="https://github.com/protocolbuffers/protobuf/blob/ab5b61bf2f0fb1ac485be1b82fffca153c2509ed/conformance/conformance_test.cc#L57-L70"><code>ToOctString</code></a>
+    function in the Protocol Buffers
+    <a href="https://github.com/protocolbuffers/protobuf/tree/master/conformance">conformance test</a>.
+  </p>
+  <div>
+    <div id="app"></div>
+    <script src="./bundle.js"></script>
+  </div>
+  <p>Here’s an example of Protocol Buffers conformance test output.</p>
+  <pre>CONFORMANCE TEST BEGIN ====================================
+
+ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataScalarBinary.UINT64[0].ProtobufOutput: Failed to parse input or produce output. request=protobuf_payload: " \000" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=runtime_error: "child exited, status=0"
+ERROR, test=Required.Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput: Output was not equivalent to reference message: deleted: oneof_nested_message.corecursive.optional_int32: 1
+deleted: oneof_nested_message.corecursive.unpacked_int32[1]: 1
+. request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"
+ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput: Output was not equivalent to reference message: Expect: \202\007\014\022\012\010\001\020\001\310\005\001\310\005\001, but got: \202\007\007\022\005\020\001\310\005\001. request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"</pre>
+   <p>This protobuf explainer is a one-page webapp built with
+    <a href="https://pursuit.purescript.org/packages/purescript-halogen"><b>purescript-halogen</b></a>
+    and
+    <a href="https://pursuit.purescript.org/packages/purescript-protobuf"><b>purescript-protobuf</b></a>.
+    Source repository is at <a href="https://github.com/jamesdbrock/protobuf-decode">https://github.com/jamesdbrock/protobuf-decode</a>.
+   </p>
 </body>
 </html>
