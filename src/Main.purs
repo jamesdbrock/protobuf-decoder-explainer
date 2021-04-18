@@ -23,23 +23,26 @@ import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Halogen as H
 import Halogen.Aff as HA
+import Halogen.HTML (HTML, object)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import Protobuf.Common (Bytes(..), WireType(..))
+import Protobuf.Common (Bytes(..), WireType(..), FieldNumber)
 import Protobuf.Decode as Decode
 import Protobuf.Runtime (UnknownField(..), parseFieldUnknown)
 import Text.Parsing.Parser (ParseError(..), Parser, ParserT, fail, runParser, runParserT)
 import Text.Parsing.Parser.Combinators (choice)
 import Text.Parsing.Parser.DataView (takeN)
-import Text.Parsing.Parser.Pos (Position)
+import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, string)
 import Text.Parsing.Parser.Token (digit, octDigit)
+import Web.HTML.Event.EventTypes (offline)
 
 type State =
   -- { enabled :: Boolean
-  { protobufString :: String
+  -- { protobufString :: String
+  { result :: Either String Message
   }
 
 data Action = Parse String
@@ -74,7 +77,8 @@ component =
 initialState :: forall i. i -> State
 initialState _ =
   -- { enabled: false
-  { protobufString: ""
+  -- { protobufString: ""
+  { result: Left ""
   }
 
 render :: forall m. State -> H.ComponentHTML Action () m
@@ -95,7 +99,10 @@ render state =
       ]
     , HH.div
       []
-      [ HH.text state.protobufString ]
+      [ case state.result of
+          Left error -> HH.text error
+          Right message -> renderMessage message
+      ]
     , HH.pre
       [ HP.style "white-space: pre-wrap;"]
       [ HH.text """
@@ -110,19 +117,34 @@ ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.
       ]
     ]
 
+
+renderMessage :: forall w i. Message -> HTML w i
+renderMessage message = HH.table []
+  [ HH.tbody_ $ message <#> \field ->
+      HH.tr_ $ case field of
+        Scalar (UnknownBits32 fieldNumber value) -> [ HH.td_ [HH.text $ show fieldNumber], HH.td_ [HH.text "Bits32"], HH.td_ [HH.text $ show value]]
+        Scalar (UnknownBits64 fieldNumber value) -> [ HH.td_ [HH.text $ show fieldNumber], HH.td_ [HH.text "Bits64"], HH.td_ [HH.text $ show value]]
+        Scalar (UnknownVarInt fieldNumber value) -> [ HH.td_ [HH.text $ show fieldNumber], HH.td_ [HH.text "VarInt"], HH.td_ [HH.text $ show value]]
+        Scalar (UnknownLenDel fieldNumber value) -> [ HH.td_ [HH.text $ show fieldNumber], HH.td_ [HH.text "Length Delimited"], HH.td_ [HH.text $ show value]]
+        Nested fieldNumber nested -> [HH.td_ [HH.text $ show fieldNumber], HH.td_ [HH.text "Length Delimited"], HH.td_ [renderMessage nested ]]
+  ]
+
 handleAction ∷ forall o m. Action → H.HalogenM State Action () o m Unit
 handleAction = case _ of
   -- Toggle ->
   --   H.modify_ \st -> st { enabled = not st.enabled }
-  Parse value -> H.modify_ \st -> st { protobufString = valueParsed }
+  Parse value -> H.modify_ \st -> st { result = valueParsed }
    where
     valueParsed = case fromOctString of
-      Left (ParseError message position) -> "Parse error " <> message <> show position
-      Right xs ->
+      Left (ParseError message position@(Position {line,column})) -> Left $ "Parse failure in text input " <> show position <> " " <> message
+      Right buf ->
         -- let xs' = unsafePerformEffect $ toArray =<< (whole xs :: Effect Uint8ClampedArray) :: Array UInt
         -- in
         -- show xs'
-        show $ unsafePerformEffect $ runParserT (DV.whole xs) $ fix $ \p -> parseMessage p
+        -- show $ unsafePerformEffect $ runParserT (DV.whole xs) $ fix $ \p -> parseMessage p
+        case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
+          Left (ParseError message (Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
+          Right message -> Right message
 
 
     -- Inverse of ToOctString
@@ -164,19 +186,20 @@ handleAction = case _ of
                 then pure d
                 else fail $ "Octal byte overflow > 255: " <> show d
           ]
-      -- See also octDigitToInt
-      -- https://pursuit.purescript.org/packages/purescript-unicode/5.0.0/docs/Data.CodePoint.Unicode#v:octDigitToInt
-      parseOctalDigit :: Parser String Int
-      parseOctalDigit = anyChar >>= case _ of
-        '0' -> pure 0
-        '1' -> pure 1
-        '2' -> pure 2
-        '3' -> pure 3
-        '4' -> pure 4
-        '5' -> pure 5
-        '6' -> pure 6
-        '7' -> pure 7
-        x   -> fail $ "Expecting octal digit but got " <> Char.singleton x
+
+-- See also octDigitToInt
+-- https://pursuit.purescript.org/packages/purescript-unicode/5.0.0/docs/Data.CodePoint.Unicode#v:octDigitToInt
+parseOctalDigit :: Parser String Int
+parseOctalDigit = anyChar >>= case _ of
+  '0' -> pure 0
+  '1' -> pure 1
+  '2' -> pure 2
+  '3' -> pure 3
+  '4' -> pure 4
+  '5' -> pure 5
+  '6' -> pure 6
+  '7' -> pure 7
+  x   -> fail $ "Expecting octal digit but got " <> Char.singleton x
 
 
 -- See https://github.com/Thimoteus/SandScript/wiki/2.-Parsing-recursively
@@ -198,19 +221,19 @@ parseField parseMessage' = do
           dv <- takeN l
           case (unsafePerformEffect (runParserT dv parseMessage')) of
             Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $ Bytes $ AB.slice (DV.byteOffset dv) (DV.byteLength dv) (DV.buffer dv)
-            Right m -> pure $ Nested m
+            Right m -> pure $ Nested fieldNumber m
     Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Decode.fixed32
 
 data Field
   = Scalar UnknownField
-  | Nested Message
+  | Nested FieldNumber Message
 -- derive instance eqField :: Eq Field
 -- derive instance showField :: Show Field
 -- derive instance genericField :: Generic Field _
 -- instance showField :: Show Field where show = genericShow
 instance showField :: Show Field where
   show (Scalar x) = show x
-  show (Nested xs) = show xs
+  show (Nested fieldNumber xs) = show fieldNumber <> " " <> show xs
 
 type Message = Array Field
 -- derive instance eqMessage :: Eq Message
