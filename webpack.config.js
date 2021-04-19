@@ -18,7 +18,9 @@ const plugins =
 ;
 
 module.exports = {
-  devtool: 'eval-source-map',
+  mode: "production",
+
+  // devtool: 'eval-source-map',
 
   devServer: {
     contentBase: path.resolve(__dirname, 'dist'),

@@ -1,5 +1,6 @@
 {
   "name": "protobuf-decode",
+  "sideEffects": false,
   "version": "1.0.0",
   "description": "Web page which decodes and explains pasted binary Protocol Buffers",
   "main": "bundle.js",
@@ -15,7 +16,7 @@
   },
   "scripts": {
     "webpack:server": "webpack serve --progress --inline --hot",
-    "webpack": "webpack --help"
+    "webpack": "npx webpack"
   },
   "repository": {
     "type": "git",
