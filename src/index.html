@@ -5,6 +5,7 @@
   <style content="text/css">
   body {
     font-family:sans-serif;
+    margin:0;
   }
   /*
   @media (prefers-color-scheme: light) {
@@ -26,11 +27,18 @@
     }
   }
   */
+  div.appwrapper {
+    padding-left:1em;
+    padding-right:1em;
+    padding-top:1em;
+    padding-bottom:1em;
+    background-color: #e4ce6d;
+  }
   table.messagetable {
     margin-left: auto;
     margin-right: auto;
     border-style: solid;
-    border-color: #c7c7c7;
+    border-color: #eeeeee;
     border-radius: 3px;
     box-shadow: 0px 5px 10px -1px #a5a5a5;
     background-color: #eeeeee;
@@ -39,6 +47,12 @@
   }
   pre {
     white-space: pre-wrap;
+    box-shadow: 0px 5px 10px -1px #a5a5a5;
+    margin-left:2em;
+    margin-right:2em;
+    margin-top:1em;
+    margin-bottom:1em;
+    padding:0.5em;
   }
   input {
     width: 100%;
@@ -46,6 +60,7 @@
     font-size: 1em;
     font-weight: bold;
     margin-bottom: 1em;
+    background-color: white;
   }
   div.dataview {
     display: flex;
@@ -80,24 +95,40 @@
   font-size: 1em;
   font-weight: bold;
   }
+  p {
+    max-width: 60em;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  h1 {
+    text-align: center;
+  }
+  ul {
+    max-width: 60em;
+    margin-left: auto;
+    margin-right: auto;
+  }
   </style>
 </head>
 
 <body>
-  <p>Paste a Google Protocol Buffers byte array into the input box, and this page will explain the structure of the byte array.</p>
+  <h1>Protobuf Decoder Explainer</h1>
+  <p>Paste a binary Google Protocol Buffers byte array into the input box, and this page will explain the <a href="https://developers.google.com/protocol-buffers/docs/encoding#structure">structure of the byte array</a>.</p>
   <p>The format of the byte array should be backslash-escaped octal characters, which is the format produced by the
     <a href="https://github.com/protocolbuffers/protobuf/blob/ab5b61bf2f0fb1ac485be1b82fffca153c2509ed/conformance/conformance_test.cc#L57-L70"><code>ToOctString</code></a>
     function in the Protocol Buffers
     <a href="https://github.com/protocolbuffers/protobuf/tree/master/conformance">conformance test</a>.
   </p>
-  <div>
+  <div class=appwrapper>
     <div id="app"></div>
     <script src="./bundle.js"></script>
   </div>
-  <p>Here’s an example of Protocol Buffers conformance test output.</p>
+  <h1>Example Input</h1>
+  <p>Here’s an example of Protocol Buffers conformance test output. Any of the escaped octal byte strings from this output
+    can be pasted into the input box for explanation.
+  </p>
   <pre>CONFORMANCE TEST BEGIN ====================================
 
-ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataScalarBinary.UINT64[0].ProtobufOutput: Failed to parse input or produce output. request=protobuf_payload: " \000" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=runtime_error: "child exited, status=0"
 ERROR, test=Required.Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufOutput: Output was not equivalent to reference message: deleted: oneof_nested_message.corecursive.optional_int32: 1
 deleted: oneof_nested_message.corecursive.unpacked_int32[1]: 1
 . request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"
@@ -108,5 +139,12 @@ ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.
     <a href="https://pursuit.purescript.org/packages/purescript-protobuf"><b>purescript-protobuf</b></a>.
     Source repository is at <a href="https://github.com/jamesdbrock/protobuf-decode">https://github.com/jamesdbrock/protobuf-decode</a>.
    </p>
+   <h1>Other tools</h1>
+   <ul>
+     <li><code>protoc --decode-raw</code></li>
+     <li><code>hexdump</code></li>
+     <li><code>xxd</code></li>
+     <li><a href="https://github.com/uber/prototool">https://github.com/uber/prototool</a></li>
+   </ul>
 </body>
 </html>

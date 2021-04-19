@@ -121,14 +121,14 @@ render state =
   --   label = if state.enabled then "On" else "Off"
   -- in HH.div []
   HH.div []
-    [ HH.h1 [] [HH.text "Protobuf Decoder Explainer"]
+    -- [ HH.h1 [] [HH.text "Protobuf Decoder Explainer"]
     -- , HH.button
     --   [ HP.title label
     --   -- , HE.onClick \_ -> Just Toggle
     --   ]
     --   [ HH.text label ]
     -- , HH.p_ [ HH.text "Paste a Protocol Buffers byte array into the input box."]
-    , HH.input
+    [ HH.input
       -- [ HP.style "width: 100%"
       [ HP.value "\\202\\007\\t\\022\\007\\010\\001\\020\\001\\310\\005\\001\\202\\007\\007\\022\\005\\020\\001\\310\\005\\001"
       , HE.onValueInput \value -> Just $ Parse value
@@ -147,33 +147,33 @@ renderMessage message = HH.table [ HP.class_ $ ClassName "messagetable" ]
   [ HH.tbody_ $ message <#> \(Tuple part field) ->
       HH.tr_ $ case field of
         Scalar (UnknownBits32 fieldNumber value) ->
-          [ HH.td [HP.class_ $ ClassName "bytes"] [renderDataView part]
-          , HH.td [HP.class_ $ ClassName "fnum"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype"] [HH.text "Bits32"]
-          , HH.td [HP.class_ $ ClassName "fval"] [HH.text $ UInt.toString value]
+          [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
+          , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "32-bit"]
+          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ UInt.toString value]
           ]
         Scalar (UnknownBits64 fieldNumber value) ->
-          [ HH.td [HP.class_ $ ClassName "bytes"] [renderDataView part]
-          , HH.td [HP.class_ $ ClassName "fnum"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype"] [HH.text "Bits64"]
-          , HH.td [HP.class_ $ ClassName "fval"] [HH.text $ Long.toString value]
+          [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
+          , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "64-bit"]
+          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
           ]
         Scalar (UnknownVarInt fieldNumber value) ->
-          [ HH.td [HP.class_ $ ClassName "bytes"] [renderDataView part]
-          , HH.td [HP.class_ $ ClassName "fnum"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype"] [HH.text "VarInt"]
-          , HH.td [HP.class_ $ ClassName "fval"] [HH.text $ Long.toString value]
+          [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
+          , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Varint"]
+          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
           ]
         Scalar (UnknownLenDel fieldNumber value) ->
-          [ HH.td [HP.class_ $ ClassName "bytes"] [renderDataView part]
-          , HH.td [HP.class_ $ ClassName "fnum"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype"] [HH.text $ "Length Delimited " <> show value]
-          , HH.td [HP.class_ $ ClassName "fval"] [HH.text "(uninterpretable)" ]
+          [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
+          , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text $ "Length-delimited"]
+          , HH.td [HP.class_ $ ClassName "fval", HP.title "Uninterpretable Field Value"] [HH.text $ "Uninterpretable " <> show value]
           ]
         Nested fieldNumber nestedMessage ->
-          [ HH.td [HP.class_ $ ClassName "bytes"] [renderDataView part]
-          , HH.td [HP.class_ $ ClassName "fnum"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype"] [HH.text "Message "]
+          [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
+          , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Length-delimited Message"]
           , HH.td [HP.class_ $ ClassName "fval"] [renderMessage nestedMessage ]
           ]
   ]
