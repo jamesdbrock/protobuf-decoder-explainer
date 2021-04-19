@@ -1,5 +1,5 @@
 {
-  "name": "protobuf-decode",
+  "name": "protobuf-decoder-explainer",
   "sideEffects": false,
   "version": "1.0.0",
   "description": "Web page which decodes and explains pasted binary Protocol Buffers",

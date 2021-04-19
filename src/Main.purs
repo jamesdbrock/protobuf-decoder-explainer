@@ -5,16 +5,13 @@ import Prelude
 import Control.Lazy (fix)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, many, zipWith)
-import Data.ArrayBuffer.ArrayBuffer (empty)
 import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.DataView as DV
-import Data.ArrayBuffer.Typed (buffer, fromArray, whole)
+import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
 import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Long.Internal as Long
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -23,80 +20,48 @@ import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UInt (UInt, fromInt)
 import Data.UInt as UInt
-import Data.Unfoldable (replicateA)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class as Effect.Class
 import Effect.Unsafe (unsafePerformEffect)
 import Halogen (ClassName(..), get)
 import Halogen as H
 import Halogen.Aff as HA
-import Halogen.HTML (HTML, object)
+import Halogen.HTML (HTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 import Protobuf.Common (Bytes(..), WireType(..), FieldNumber)
 import Protobuf.Decode as Decode
-import Protobuf.Runtime (UnknownField(..), parseFieldUnknown)
+import Protobuf.Runtime (UnknownField(..))
 import Text.Parsing.Parser (ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT)
 import Text.Parsing.Parser.Combinators (choice)
 import Text.Parsing.Parser.DataView (takeN)
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, string)
-import Text.Parsing.Parser.Token (digit, octDigit)
 import Web.DOM.Element (getAttribute)
 import Web.DOM.NodeList (toArray)
-import Web.DOM.NonElementParentNode (getElementById)
 import Web.DOM.ParentNode (QuerySelector(..), querySelectorAll)
 import Web.HTML (HTMLElement, window)
-import Web.HTML.Event.EventTypes (offline)
-import Web.HTML.HTMLDocument (toDocument, toParentNode)
-import Web.HTML.HTMLElement (fromElement, fromNode, toElement)
+import Web.HTML.HTMLDocument (toParentNode)
+import Web.HTML.HTMLElement (fromNode, toElement)
 import Web.HTML.Window (document)
 
 type State =
-  -- { enabled :: Boolean
-  -- { protobufString :: String
   { result :: Either String Message
   }
 
 data Action = Parse String
 
-
 main :: Effect Unit
 main = HA.runHalogenAff do
-  -- runUI Button.component unit body
-  -- body <- HA.awaitBody
-  -- runUI component unit body
-
-  -- appMay <- do
-  --   element <- getElementById "root" =<< toNonElementParentNode <$> toDocument <$> (document =<< window)
-  --   pure $ fromElement =<< element
-  -- case appMay of
-  --   Nothing -> pure unit
-  --   Just app -> runUI component unit app
-
   elements <- awaitSelectAll
     { query: QuerySelector "div#app"
     , attr: ""
     }
   for_ (head elements) \e -> runUI component unit e.element
 
-
--- component :: forall q i o m. H.Component q i o m
--- component =
---   H.mkComponent
---     { unit
---     , render
---     , eval: H.mkEval $ H.defaultEval { }
---     }
---
--- render :: forall m. Unit -> H.ComponentHTML Unit () m
--- render _ =
---   HH.h1 [] [HH.text "Protobuf Decoder"]
---
 component :: forall q i o m. H.Component HH.HTML q i o m
 component =
   H.mkComponent
@@ -110,26 +75,13 @@ initialInput = "\\202\\007\\t\\022\\007\\010\\001\\020\\001\\310\\005\\001\\202\
 
 initialState :: forall i. i -> State
 initialState _ =
-  -- { enabled: false
-  -- { protobufString: ""
   { result: parseInput initialInput
   }
 
 render :: forall m. State -> H.ComponentHTML Action () m
 render state =
-  -- let
-  --   label = if state.enabled then "On" else "Off"
-  -- in HH.div []
   HH.div []
-    -- [ HH.h1 [] [HH.text "Protobuf Decoder Explainer"]
-    -- , HH.button
-    --   [ HP.title label
-    --   -- , HE.onClick \_ -> Just Toggle
-    --   ]
-    --   [ HH.text label ]
-    -- , HH.p_ [ HH.text "Paste a Protocol Buffers byte array into the input box."]
     [ HH.input
-      -- [ HP.style "width: 100%"
       [ HP.value "\\202\\007\\t\\022\\007\\010\\001\\020\\001\\310\\005\\001\\202\\007\\007\\022\\005\\020\\001\\310\\005\\001"
       , HE.onValueInput \value -> Just $ Parse value
       ]
@@ -140,7 +92,6 @@ render state =
           Right message -> renderMessage message
       ]
     ]
-
 
 renderMessage :: forall w i. Message -> HTML w i
 renderMessage message = HH.table [ HP.class_ $ ClassName "messagetable" ]
@@ -188,7 +139,6 @@ renderDataView dv = HH.div
   buf = DV.buffer dv
   bytearray = unsafePerformEffect $ AT.toArray =<< (AT.part buf offset len :: Effect Uint8ClampedArray) :: Array UInt
 
-
 handleAction ∷ forall o m. Action → H.HalogenM State Action () o m Unit
 handleAction = case _ of
   Parse value -> H.modify_ \st -> st { result = parseInput value }
@@ -197,14 +147,9 @@ parseInput :: String -> Either String Message
 parseInput input = case fromOctString input of
   Left (ParseError message position@(Position {line,column})) -> Left $ "Parse failure in text input " <> show position <> " " <> message
   Right buf ->
-    -- let xs' = unsafePerformEffect $ toArray =<< (whole xs :: Effect Uint8ClampedArray) :: Array UInt
-    -- in
-    -- show xs'
-    -- show $ unsafePerformEffect $ runParserT (DV.whole xs) $ fix $ \p -> parseMessage p
     case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
       Left (ParseError message (Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
       Right message -> Right message
-
 
 -- Inverse of ToOctString
 -- https://github.com/protocolbuffers/protobuf/blob/ab5b61bf2f0fb1ac485be1b82fffca153c2509ed/conformance/conformance_test.cc#L57
@@ -216,7 +161,6 @@ parseInput input = case fromOctString input of
 -- request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"
 fromOctString :: String -> Either ParseError ArrayBuffer
 fromOctString value = runParser value do
-  -- pure $ unsafePerformEffect $ empty 0
   xs <- many parseByte
   let buf = unsafePerformEffect (fromArray xs) :: Uint8ClampedArray
   pure $ buffer buf
@@ -260,7 +204,6 @@ parseOctalDigit = anyChar >>= case _ of
   '7' -> pure 7
   x   -> fail $ "Expecting octal digit but got " <> Char.singleton x
 
-
 -- See https://github.com/Thimoteus/SandScript/wiki/2.-Parsing-recursively
 parseMessage :: ParserT DataView Effect Message -> ParserT DataView Effect Message
 parseMessage recurse = many $ match $ parseField recurse
@@ -268,7 +211,6 @@ parseMessage recurse = many $ match $ parseField recurse
 parseField :: ParserT DataView Effect Message -> ParserT DataView Effect Field
 parseField parseMessage' = do
   Tuple fieldNumber wireType <- Decode.tag32
-  -- parseFieldUnknown (UInt.toInt fieldNumber) wireType
   case wireType of
     VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.uint64
     Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Decode.fixed64
@@ -286,17 +228,12 @@ parseField parseMessage' = do
 data Field
   = Scalar UnknownField
   | Nested FieldNumber Message
--- derive instance eqField :: Eq Field
--- derive instance showField :: Show Field
--- derive instance genericField :: Generic Field _
--- instance showField :: Show Field where show = genericShow
 instance showField :: Show Field where
   show (Scalar x) = show x
   show (Nested fieldNumber xs) = show fieldNumber <> " " <> show (map snd xs)
 
 -- array of each parsed field, plus the matched DataView
 type Message = Array (Tuple DataView Field)
-
 
 -----------
 -- Selection Helpers
