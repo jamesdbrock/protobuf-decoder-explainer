@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 
+import Control.Alt (alt)
 import Control.Lazy (fix)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, many, zipWith)
@@ -10,6 +11,7 @@ import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
 import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray)
+import Data.Char (toCharCode)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Int (hexadecimal, toStringAs)
@@ -86,7 +88,7 @@ render state =
       , HE.onValueInput \value -> Just $ Parse value
       ]
     , HH.div
-      []
+      [ HP.class_ $ ClassName "tablewrapper"]
       [ case state.result of
           Left error -> HH.text error
           Right message -> renderMessage message
@@ -166,29 +168,33 @@ fromOctString value = runParser value do
   pure $ buffer buf
   where
   parseByte :: Parser String UInt
-  parseByte = do
-    void $ string "\\"
-    fromInt <$> choice
-      [ string "'" *> pure 0x27
-      , string "\"" *> pure 0x22
-      , string "?" *> pure 0x3f
-      , string "\\" *> pure 0x5c
-      , string "a" *> pure 0x07
-      , string "b" *> pure 0x08
-      , string "f" *> pure 0x0c
-      , string "n" *> pure 0x0a
-      , string "r" *> pure 0x0d
-      , string "t" *> pure 0x09
-      , string "v" *> pure 0x0b
-      , do
-          d0 <- parseOctalDigit
-          d1 <- parseOctalDigit
-          d2 <- parseOctalDigit
-          let d = (d0 * 64) + (d1 * 8) + d2
-          if d <= 255
-            then pure d
-            else fail $ "Octal byte overflow > 255: " <> show d
-      ]
+  parseByte = alt
+    do
+      void $ string "\\"
+      fromInt <$> choice
+        [ string "'" *> pure 0x27
+        , string "\"" *> pure 0x22
+        , string "?" *> pure 0x3f
+        , string "\\" *> pure 0x5c
+        , string "a" *> pure 0x07
+        , string "b" *> pure 0x08
+        , string "f" *> pure 0x0c
+        , string "n" *> pure 0x0a
+        , string "r" *> pure 0x0d
+        , string "t" *> pure 0x09
+        , string "v" *> pure 0x0b
+        , do
+            d0 <- parseOctalDigit
+            d1 <- parseOctalDigit
+            d2 <- parseOctalDigit
+            let d = (d0 * 64) + (d1 * 8) + d2
+            if d <= 255
+              then pure d
+              else fail $ "Octal byte overflow > 255: " <> show d
+        ]
+    do
+      fromInt <$> toCharCode <$> anyChar
+
 
 -- See also octDigitToInt
 -- https://pursuit.purescript.org/packages/purescript-unicode/5.0.0/docs/Data.CodePoint.Unicode#v:octDigitToInt

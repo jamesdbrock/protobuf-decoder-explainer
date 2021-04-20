@@ -35,9 +35,13 @@
     padding-bottom:1em;
     background-color: #e4ce6d;
   }
+  div.tablewrapper {
+    display: flex;
+    flex-direction: row;
+    place-content: center;
+  }
   table.messagetable {
-    margin-left: auto;
-    margin-right: auto;
+    width:fit-content;
     border-style: solid;
     border-color: #eeeeee;
     border-radius: 3px;
@@ -140,12 +144,21 @@ ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.
     <a href="https://pursuit.purescript.org/packages/purescript-protobuf"><b>purescript-protobuf</b></a>.
     Source repository is at <a href="https://github.com/jamesdbrock/protobuf-decoder-explainer">https://github.com/jamesdbrock/protobuf-decode</a>.
    </p>
+   <h1>Explaining a binary protobuf file</h1>
+   <p>If you have a file named <code>binary_protobuf_file.pb</code> containing binary protobuf and you want the contents of the file explained, then
+     run this command, copy the resulting escaped-octal output, and paste it into the input box on this page. Your browser will probably
+     stack-overflow if the file is larger than a few thousand bytes.
+   </p>
+   <p>
+    <code>cat binary_protobuf_file.pb | hexdump --one-byte-octal --no-squeezing | sed s/^[[:xdigit:]]*// | sed 's/ *$//' | tr ' ' '\' | tr -d '\n'</code>
+   </p>
    <h1>Other tools</h1>
    <ul>
-     <li><code>protoc --decode-raw</code></li>
+     <li><code>protoc --decode_raw</code></li>
      <li><code>hexdump</code></li>
      <li><code>xxd</code></li>
      <li><a href="https://github.com/uber/prototool">https://github.com/uber/prototool</a></li>
+     <li><a href="https://github.com/mildsunrise/protobuf-inspector">https://github.com/mildsunrise/protobuf-inspector</a></li>
    </ul>
 </body>
 </html>

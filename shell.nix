@@ -24,10 +24,15 @@ pkgs.mkShell {
   # echo "spago bundle-module --main Main --to bundle.js"
   # echo ""
   shellHook = ''
+  echo "First install these dependencies from"
   echo "https://github.com/purescript/spago#get-started-from-scratch-with-webpack-frontend-projects"
-  echo "npm install --save-dev webpack webpack-cli webpack-dev-server purescript-psa purs-loader html-webpack-plugin long"
-  echo "npm run webpack:server"
-  echo "npm run webpack"
+  echo ""
+  echo "    npm install --save-dev webpack webpack-cli webpack-dev-server purescript-psa purs-loader html-webpack-plugin long"
+  echo ""
+  echo "Then build the ./dist/index.html file."
+  echo ""
+  echo "    npx webpack"
+  echo ""
   '';
 }
 
