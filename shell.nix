@@ -28,6 +28,7 @@ pkgs.mkShell {
   echo "https://github.com/purescript/spago#get-started-from-scratch-with-webpack-frontend-projects"
   echo ""
   echo "    npm install --save-dev webpack webpack-cli webpack-dev-server purescript-psa purs-loader html-webpack-plugin long"
+  echo "    spago install"
   echo ""
   echo "Then build the ./dist/index.html file."
   echo ""

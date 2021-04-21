@@ -6,6 +6,7 @@
   , "protobuf"
   , "halogen"
   , "unicode"
+  , "debug"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs" ]

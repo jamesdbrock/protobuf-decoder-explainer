@@ -19,6 +19,7 @@ const plugins =
 
 module.exports = {
   mode: "production",
+  // mode: "development",
 
   // devtool: 'eval-source-map',
 

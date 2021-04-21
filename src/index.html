@@ -36,9 +36,9 @@
     background-color: #e4ce6d;
   }
   div.tablewrapper {
-    display: flex;
-    flex-direction: row;
-    place-content: center;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
   }
   table.messagetable {
     width:fit-content;
@@ -92,8 +92,10 @@
   }
   td.ftype {
   }
-  td.fval {
+  td.fvalnumeric {
     text-align: right;
+  }
+  td.fvalbytes {
   }
   code {
   font-family: monospace, monospace;
@@ -112,6 +114,10 @@
     max-width: 60em;
     margin-left: auto;
     margin-right: auto;
+  }
+  div.maxdepth {
+    color:#999999;
+    font-style: italic;
   }
   </style>
 </head>
@@ -138,12 +144,8 @@ ERROR, test=Required.Proto3.ProtobufInput.ValidDataOneof.MESSAGE.Merge.ProtobufO
 deleted: oneof_nested_message.corecursive.unpacked_int32[1]: 1
 . request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"
 ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.ProtobufOutput: Output was not equivalent to reference message: Expect: \202\007\014\022\012\010\001\020\001\310\005\001\310\005\001, but got: \202\007\007\022\005\020\001\310\005\001. request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"</pre>
-   <p>This protobuf explainer is a one-page webapp built with
-    <a href="https://pursuit.purescript.org/packages/purescript-halogen"><b>purescript-halogen</b></a>
-    and
-    <a href="https://pursuit.purescript.org/packages/purescript-protobuf"><b>purescript-protobuf</b></a>.
-    Source repository is at <a href="https://github.com/jamesdbrock/protobuf-decoder-explainer">https://github.com/jamesdbrock/protobuf-decode</a>.
-   </p>
+   <p>Here's a longer example protobuf.</p>
+   <pre style="overflow: scroll;">\012\036\032\013\155\156\151\163\164\137\164\162\141\151\156\022\017\060\060\060\060\060\060\055\156\165\155\065\056\160\156\147\022\243\003\062\240\003\012\107\052\105\012\017\012\015\012\011\142\007\012\005\012\003\034\034\001\022\000\022\060\052\056\012\023\012\021\012\015\302\001\012\012\010\032\006\012\004\005\005\001\020\022\000\022\025\012\023\012\017\302\001\014\012\012\012\010\012\001\020\025\000\000\000\000\022\000\030\000\030\001\022\324\002\062\321\002\012\040\012\036\012\032\022\030\010\020\020\001\032\010\010\005\020\001\030\000\040\000\032\010\010\005\020\001\030\000\040\000\022\000\022\254\002\062\251\002\012\100\052\076\012\010\012\006\012\002\052\000\022\000\022\060\052\056\012\023\012\021\012\015\302\001\012\012\010\032\006\012\004\003\003\020\040\022\000\022\025\012\023\012\017\302\001\014\012\012\012\010\012\001\040\025\000\000\000\000\022\000\030\000\030\001\022\344\001\062\341\001\012\040\012\036\012\032\022\030\010\040\020\001\032\010\010\003\020\003\030\000\040\000\032\010\010\003\020\003\030\000\040\000\022\000\022\274\001\062\271\001\012\100\052\076\012\010\012\006\012\002\052\000\022\000\022\060\052\056\012\023\012\021\012\015\302\001\012\012\010\032\006\012\004\004\004\040\040\022\000\022\025\012\023\012\017\302\001\014\012\012\012\010\012\001\040\025\000\000\000\000\022\000\030\000\030\001\022\165\062\163\012\040\012\036\012\032\022\030\010\040\020\001\032\010\010\004\020\002\030\000\040\000\032\010\010\004\020\002\030\000\040\000\022\000\022\117\062\115\012\077\052\075\012\010\012\006\012\002\052\000\022\000\022\057\052\055\012\022\012\020\012\014\302\001\011\012\007\042\005\012\003\240\002\012\022\000\022\025\012\023\012\017\302\001\014\012\012\012\010\012\001\012\025\000\000\000\000\022\000\030\000\030\001\022\012\012\010\012\004\012\002\010\012\022\000</pre>
    <h1>Explaining a binary protobuf file</h1>
    <p>If you have a file named <code>binary_protobuf_file.pb</code> containing binary protobuf and you want the contents of the file explained, then
      run this command, copy the resulting escaped-octal output, and paste it into the input box on this page. Your browser will probably
@@ -160,5 +162,12 @@ ERROR, test=Recommended.Proto3.ProtobufInput.ValidDataOneofBinary.MESSAGE.Merge.
      <li><a href="https://github.com/uber/prototool">https://github.com/uber/prototool</a></li>
      <li><a href="https://github.com/mildsunrise/protobuf-inspector">https://github.com/mildsunrise/protobuf-inspector</a></li>
    </ul>
+   <h1>What is this</h1>
+   <p>This protobuf explainer is a one-page webapp built with
+    <a href="https://pursuit.purescript.org/packages/purescript-halogen"><b>purescript-halogen</b></a>
+    and
+    <a href="https://pursuit.purescript.org/packages/purescript-protobuf"><b>purescript-protobuf</b></a>.
+    Source repository is at <a href="https://github.com/jamesdbrock/protobuf-decoder-explainer">https://github.com/jamesdbrock/protobuf-decode</a>.
+   </p>
 </body>
 </html>

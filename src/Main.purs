@@ -10,14 +10,16 @@ import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
-import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray)
+import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray, Uint8Array)
 import Data.Char (toCharCode)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Long.Internal as Long
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (unwrap)
 import Data.String.CodeUnits as Char
+import Data.TextDecoding (decodeUtf8)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UInt (UInt, fromInt)
@@ -84,50 +86,59 @@ render :: forall m. State -> H.ComponentHTML Action () m
 render state =
   HH.div []
     [ HH.input
-      [ HP.value "\\202\\007\\t\\022\\007\\010\\001\\020\\001\\310\\005\\001\\202\\007\\007\\022\\005\\020\\001\\310\\005\\001"
+      [ HP.value initialInput
       , HE.onValueInput \value -> Just $ Parse value
       ]
     , HH.div
       [ HP.class_ $ ClassName "tablewrapper"]
       [ case state.result of
           Left error -> HH.text error
-          Right message -> renderMessage message
+          Right message -> renderMessage 0 message
       ]
     ]
 
-renderMessage :: forall w i. Message -> HTML w i
-renderMessage message = HH.table [ HP.class_ $ ClassName "messagetable" ]
+renderMessage :: forall w i. Int -> Message -> HTML w i
+renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
   [ HH.tbody_ $ message <#> \(Tuple part field) ->
       HH.tr_ $ case field of
         Scalar (UnknownBits32 fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "32-bit"]
-          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ UInt.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ UInt.toString value]
           ]
         Scalar (UnknownBits64 fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "64-bit"]
-          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
           ]
         Scalar (UnknownVarInt fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Varint"]
-          , HH.td [HP.class_ $ ClassName "fval", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
           ]
         Scalar (UnknownLenDel fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text $ "Length-delimited"]
-          , HH.td [HP.class_ $ ClassName "fval", HP.title "Uninterpretable Field Value"] [HH.text $ "Uninterpretable " <> show value]
+          , HH.td [HP.class_ $ ClassName "fvalbytes", HP.title "Field Value"]
+            [HH.text $ show value <> case decodeUtf8 $ unsafePerformEffect $ mkTypedArray $ DV.whole $ unwrap value of
+                Right s -> " \"" <> s <> "\""
+                Left _ -> " (Not UTF-8)"
+            ]
           ]
         Nested fieldNumber nestedMessage ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Length-delimited Message"]
-          , HH.td [HP.class_ $ ClassName "fval"] [renderMessage nestedMessage ]
+          , HH.td [HP.class_ $ ClassName "fval"]
+            [renderMessage (depth+1) nestedMessage]
+            -- [ if depth < 15
+            --   then renderMessage (depth+1) nestedMessage
+            --   else HH.div [HP.class_ $ ClassName "maxdepth"] [HH.text "Max depth 15"]
+            -- ]
           ]
   ]
 
@@ -147,7 +158,7 @@ handleAction = case _ of
 
 parseInput :: String -> Either String Message
 parseInput input = case fromOctString input of
-  Left (ParseError message position@(Position {line,column})) -> Left $ "Parse failure in text input " <> show position <> " " <> message
+  Left (ParseError message position@(Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
   Right buf ->
     case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
       Left (ParseError message (Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
@@ -159,8 +170,6 @@ parseInput input = case fromOctString input of
 -- Also it seems like it can contain C++ escape sequences?
 -- https://en.cppreference.com/w/cpp/language/escape
 -- For example
--- Expect: \202\007\014\022\012\010\001\020\001\310\005\001\310\005\001, but got: \202\007\007\022\005\020\001\310\005\001. request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001"
--- request=protobuf_payload: "\202\007\t\022\007\010\001\020\001\310\005\001\202\007\007\022\005\020\001\310\005\001" requested_output_format: PROTOBUF message_type: "protobuf_test_messages.proto3.TestAllTypesProto3" test_category: BINARY_TEST, response=protobuf_payload: "\202\007\007\022\005\020\001\310\005\001"
 fromOctString :: String -> Either ParseError ArrayBuffer
 fromOctString value = runParser value do
   xs <- many parseByte
@@ -227,9 +236,17 @@ parseField parseMessage' = do
         Just l -> do
           dv <- takeN l
           case (unsafePerformEffect (runParserT dv parseMessage')) of
-            Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $ Bytes $ AB.slice (DV.byteOffset dv) (DV.byteLength dv) (DV.buffer dv)
             Right m -> pure $ Nested fieldNumber m
+            Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $
+                  Bytes $ AB.slice (DV.byteOffset dv) (DV.byteOffset dv + DV.byteLength dv) (DV.buffer dv)
     Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Decode.fixed32
+
+mkTypedArray :: DataView -> Effect Uint8Array
+mkTypedArray dv = do
+  let buffer     = DV.buffer dv
+      byteOffset = DV.byteOffset dv
+      byteLength = DV.byteLength dv
+  AT.part buffer byteOffset byteLength
 
 data Field
   = Scalar UnknownField

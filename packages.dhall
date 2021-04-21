@@ -124,7 +124,7 @@ let upstream =
 let overrides =
   { protobuf =
       -- upstream.protobuf // { repo = "https://github.com/xc-jp/purescript-protobuf" }
-      upstream.protobuf // { version = "v1.5.0" }
+      upstream.protobuf // { version = "v1.6.0" }
   }
 
 let additions = {=}
