@@ -1,6 +1,6 @@
 'use strict';
 
-require('./Main.purs').main();
+require('./Main/index.js').main();
 
 if (module.hot) {
   module.hot.accept();

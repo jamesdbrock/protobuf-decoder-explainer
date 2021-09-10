@@ -10,3 +10,4 @@ output
 .spago
 dist
 bundle.js
+dce-output

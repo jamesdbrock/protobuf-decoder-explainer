@@ -117,16 +117,30 @@ let additions =
 -------------------------------
 -}
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20210118/packages.dhall sha256:a59c5c93a68d5d066f3815a89f398bcf00e130a51cb185b2da29b20e2d8ae115
+      https://github.com/purescript/package-sets/releases/download/psc-0.14.3-20210825/packages.dhall sha256:eee0765aa98e0da8fc414768870ad588e7cada060f9f7c23c37385c169f74d9f
 
 -- let overrides = {=}
 
 let overrides =
   { protobuf =
-      -- upstream.protobuf // { repo = "https://github.com/xc-jp/purescript-protobuf" }
-      upstream.protobuf // { version = "v1.6.0" }
+    { repo = "https://github.com/xc-jp/purescript-protobuf.git"
+    , version = "v2.1.2"
+    , dependencies =
+      [ "arraybuffer"
+      , "arraybuffer-builder"
+      , "arraybuffer-types"
+      , "longs"
+      , "node-buffer"
+      , "node-path"
+      , "node-process"
+      , "node-streams"
+      , "parsing"
+      , "parsing-dataview"
+      , "text-encoding"
+      , "uint"
+      ]
+    }
   }
-
 let additions = {=}
 
 in  upstream // overrides // additions

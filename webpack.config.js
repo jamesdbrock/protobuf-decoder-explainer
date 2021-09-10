@@ -29,7 +29,7 @@ module.exports = {
     stats: 'errors-only'
   },
 
-  entry: './src/index.js',
+  entry: '/dce-output/index.js',
 
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -38,22 +38,22 @@ module.exports = {
 
   module: {
     rules: [
-      {
-        test: /\.purs$/,
-        use: [
-          {
-            loader: 'purs-loader',
-            options: {
-              src: [
-                'src/**/*.purs'
-              ],
-              spago: true,
-              watch: isWebpackDevServer || isWatch,
-              pscIde: true
-            }
-          }
-        ]
-      },
+      // {
+      //   test: /\.purs$/,
+      //   use: [
+      //     {
+      //       loader: 'purs-loader',
+      //       options: {
+      //         src: [
+      //           'src/**/*.purs'
+      //         ],
+      //         spago: true,
+      //         watch: isWebpackDevServer || isWatch,
+      //         pscIde: true
+      //       }
+      //     }
+      //   ]
+      // },
       {
         test: /\.(png|jpg|gif)$/i,
         use: [
@@ -69,8 +69,8 @@ module.exports = {
   },
 
   resolve: {
-    modules: [ 'node_modules' ],
-    extensions: [ '.purs', '.js']
+    modules: [ 'node_modules', 'dce-output' ],
+    extensions: [ '.js']
   },
 
   plugins: [

@@ -7,6 +7,7 @@ import Control.Lazy (fix)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, many, zipWith)
 import Data.ArrayBuffer.ArrayBuffer as AB
+import Data.ArrayBuffer.Builder (DataBuff(..), toView)
 import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
@@ -36,9 +37,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import Protobuf.Common (Bytes(..), WireType(..), FieldNumber)
-import Protobuf.Decode as Decode
-import Protobuf.Runtime (UnknownField(..))
+import Protobuf.Internal.Common (Bytes(..), WireType(..), FieldNumber)
+import Protobuf.Internal.Decode as Decode
+import Protobuf.Internal.Runtime (UnknownField(..))
 import Text.Parsing.Parser (ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT)
 import Text.Parsing.Parser.Combinators (choice)
 import Text.Parsing.Parser.DataView (takeN)
@@ -66,7 +67,7 @@ main = HA.runHalogenAff do
     }
   for_ (head elements) \e -> runUI component unit e.element
 
-component :: forall q i o m. H.Component HH.HTML q i o m
+component :: forall q i o m. H.Component q i o m
 component =
   H.mkComponent
     { initialState
@@ -87,7 +88,7 @@ render state =
   HH.div []
     [ HH.input
       [ HP.value initialInput
-      , HE.onValueInput \value -> Just $ Parse value
+      , HE.onValueInput \value -> Parse value
       ]
     , HH.div
       [ HP.class_ $ ClassName "tablewrapper"]
@@ -124,7 +125,7 @@ renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text $ "Length-delimited"]
           , HH.td [HP.class_ $ ClassName "fvalbytes", HP.title "Field Value"]
-            [HH.text $ show value <> case decodeUtf8 $ unsafePerformEffect $ mkTypedArray $ DV.whole $ unwrap value of
+            [HH.text $ show value <> case decodeUtf8 $ unsafePerformEffect $ mkTypedArray $ toView $ unwrap value of
                 Right s -> " \"" <> s <> "\""
                 Left _ -> " (Not UTF-8)"
             ]
@@ -225,21 +226,20 @@ parseMessage recurse = many $ match $ parseField recurse
 
 parseField :: ParserT DataView Effect Message -> ParserT DataView Effect Field
 parseField parseMessage' = do
-  Tuple fieldNumber wireType <- Decode.tag32
+  Tuple fieldNumber wireType <- Decode.decodeTag32
   case wireType of
-    VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.uint64
-    Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Decode.fixed64
+    VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.decodeUint64
+    Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Decode.decodeFixed64
     LenDel -> do
-      len <- Long.toInt <$> Decode.varint64
+      len <- Long.toInt <$> Decode.decodeVarint64
       case len of
         Nothing -> fail "Length-delimited value of unknown field was too long."
         Just l -> do
           dv <- takeN l
           case (unsafePerformEffect (runParserT dv parseMessage')) of
             Right m -> pure $ Nested fieldNumber m
-            Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $
-                  Bytes $ AB.slice (DV.byteOffset dv) (DV.byteOffset dv + DV.byteLength dv) (DV.buffer dv)
-    Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Decode.fixed32
+            Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $ Bytes $ View dv
+    Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Decode.decodeFixed32
 
 mkTypedArray :: DataView -> Effect Uint8Array
 mkTypedArray dv = do
