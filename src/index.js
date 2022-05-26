@@ -1,6 +1,6 @@
-'use strict';
+import {main} from './output/Main/index.js';
 
-require('./Main/index.js').main();
+main();
 
 if (module.hot) {
   module.hot.accept();

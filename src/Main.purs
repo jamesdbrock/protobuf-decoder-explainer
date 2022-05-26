@@ -16,16 +16,20 @@ import Data.Char (toCharCode)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Int (hexadecimal, toStringAs)
-import Data.Long.Internal as Long
+import Data.Int64 as Int64
+import Data.UInt64 as UInt64
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits as Char
-import Data.TextDecoding (decodeUtf8)
+import Web.Encoding.TextDecoder (TextDecoder)
+import Web.Encoding.TextDecoder as TextDecoder
+import Web.Encoding.UtfLabel (utf8)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UInt (UInt, fromInt)
 import Data.UInt as UInt
 import Effect (Effect)
+import Effect.Exception (try)
 import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -40,11 +44,10 @@ import Halogen.VDom.Driver (runUI)
 import Protobuf.Internal.Common (Bytes(..), WireType(..), FieldNumber)
 import Protobuf.Internal.Decode as Decode
 import Protobuf.Internal.Runtime (UnknownField(..))
-import Text.Parsing.Parser (ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT)
-import Text.Parsing.Parser.Combinators (choice)
-import Text.Parsing.Parser.DataView (takeN)
-import Text.Parsing.Parser.Pos (Position(..))
-import Text.Parsing.Parser.String (anyChar, string)
+import Parsing (Position (..), ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT, getParserT)
+import Parsing.Combinators (choice)
+import Parsing.DataView (takeN)
+import Parsing.String (anyChar, string)
 import Web.DOM.Element (getAttribute)
 import Web.DOM.NodeList (toArray)
 import Web.DOM.ParentNode (QuerySelector(..), querySelectorAll)
@@ -98,6 +101,9 @@ render state =
       ]
     ]
 
+textdecoder :: TextDecoder
+textdecoder = unsafePerformEffect $ TextDecoder.new utf8
+
 renderMessage :: forall w i. Int -> Message -> HTML w i
 renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
   [ HH.tbody_ $ message <#> \(Tuple part field) ->
@@ -112,22 +118,26 @@ renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "64-bit"]
-          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ UInt64.toString value]
           ]
         Scalar (UnknownVarInt fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Varint"]
-          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ Long.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ UInt64.toString value]
           ]
         Scalar (UnknownLenDel fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text $ "Length-delimited"]
           , HH.td [HP.class_ $ ClassName "fvalbytes", HP.title "Field Value"]
-            [HH.text $ show value <> case decodeUtf8 $ unsafePerformEffect $ mkTypedArray $ toView $ unwrap value of
-                Right s -> " \"" <> s <> "\""
-                Left _ -> " (Not UTF-8)"
+            [HH.text $ show value <>
+              ( unsafePerformEffect do
+                  arr <- mkTypedArray $ toView $ unwrap value
+                  try (TextDecoder.decode arr textdecoder) >>= case _ of
+                    Right s -> pure $ " \"" <> s <> "\""
+                    Left _ -> pure $ " (Not UTF-8)"
+              )
             ]
           ]
         Nested fieldNumber nestedMessage ->
@@ -159,10 +169,10 @@ handleAction = case _ of
 
 parseInput :: String -> Either String Message
 parseInput input = case fromOctString input of
-  Left (ParseError message position@(Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
+  Left (ParseError message position@(Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
   Right buf ->
     case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
-      Left (ParseError message (Position {line,column})) -> Left $ "Parse failure at byte offset " <> show (column-1) <> ": " <> message
+      Left (ParseError message (Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
       Right message -> Right message
 
 -- Inverse of ToOctString
@@ -231,7 +241,7 @@ parseField parseMessage' = do
     VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.decodeUint64
     Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Decode.decodeFixed64
     LenDel -> do
-      len <- Long.toInt <$> Decode.decodeVarint64
+      len <- UInt64.toInt <$> Decode.decodeVarint64
       case len of
         Nothing -> fail "Length-delimited value of unknown field was too long."
         Just l -> do
@@ -283,9 +293,9 @@ selectElements { query, attr } = do
 -- | ParserT DataView match combinator
 match :: forall a m. MonadEffect m => ParserT DataView m a -> ParserT DataView m (Tuple DataView a)
 match p = do
-  ParseState input (Position {column:column0}) _ <- get
+  ParseState input (Position {index:index0}) _ <- getParserT
   x <- p
-  ParseState _ (Position {column:column1}) _ <- get
-  part <- lift $ liftEffect $ DV.part (DV.buffer input) (DV.byteOffset input + (column0-1)) (column1-column0)
+  ParseState _ (Position {index:index1}) _ <- getParserT
+  part <- lift $ liftEffect $ DV.part (DV.buffer input) (DV.byteOffset input + index0) (index1-index0)
   pure $ Tuple part x
 

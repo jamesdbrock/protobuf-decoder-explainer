@@ -29,7 +29,7 @@ module.exports = {
     stats: 'errors-only'
   },
 
-  entry: '/dce-output/index.js',
+  entry: './index.js',
 
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -69,7 +69,7 @@ module.exports = {
   },
 
   resolve: {
-    modules: [ 'node_modules', 'dce-output' ],
+    modules: [ 'node_modules', ],
     extensions: [ '.js']
   },
 

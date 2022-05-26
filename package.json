@@ -1,22 +1,20 @@
 {
   "name": "protobuf-decoder-explainer",
   "sideEffects": false,
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Web page which decodes and explains pasted binary Protocol Buffers",
   "main": "bundle.js",
-  "dependencies": {},
   "devDependencies": {
-    "html-webpack-plugin": "^5.3.2",
-    "long": "^4.0.0",
+    "html-webpack-plugin": "^5.5.0",
     "purescript-psa": "^0.8.2",
     "purs-loader": "^3.7.2",
-    "webpack": "^5.52.0",
-    "webpack-cli": "^4.8.0",
-    "webpack-dev-server": "^3.11.2"
+    "webpack": "^5.72.1",
+    "webpack-cli": "^4.9.2",
+    "webpack-dev-server": "^4.9.0"
   },
   "scripts": {
     "webpack:server": "webpack serve --progress --inline --hot",
-    "webpack": "spago build --purs-args '--codegen corefn,js' && zephyr -f Main.main && cp src/index.js dce-output/ && npx webpack"
+    "webpack": "spago build --purs-args '--codegen corefn,js' && npx webpack"
   },
   "repository": {
     "type": "git",
