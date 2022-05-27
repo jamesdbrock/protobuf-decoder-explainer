@@ -13,7 +13,7 @@
     "webpack-dev-server": "^4.9.0"
   },
   "scripts": {
-    "webpack:server": "webpack serve --progress --inline --hot",
+    "webpack:server": "webpack serve --progress --hot",
     "webpack": "spago build --purs-args '--codegen corefn,js' && npx webpack"
   },
   "repository": {

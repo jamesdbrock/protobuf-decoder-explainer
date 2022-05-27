@@ -6,34 +6,29 @@ import Control.Alt (alt)
 import Control.Lazy (fix)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, many, zipWith)
-import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.Builder (DataBuff(..), toView)
 import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
 import Data.ArrayBuffer.Types (ArrayBuffer, DataView, Uint8ClampedArray, Uint8Array)
 import Data.Char (toCharCode)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Foldable (for_)
 import Data.Int (hexadecimal, toStringAs)
-import Data.Int64 as Int64
-import Data.UInt64 as UInt64
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits as Char
-import Web.Encoding.TextDecoder (TextDecoder)
-import Web.Encoding.TextDecoder as TextDecoder
-import Web.Encoding.UtfLabel (utf8)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..), snd)
 import Data.UInt (UInt, fromInt)
 import Data.UInt as UInt
+import Data.UInt64 as UInt64
 import Effect (Effect)
-import Effect.Exception (try)
 import Effect.Aff (Aff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Exception (try)
 import Effect.Unsafe (unsafePerformEffect)
-import Halogen (ClassName(..), get)
+import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML (HTML)
@@ -41,16 +36,19 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Parsing (Position(..), ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT, getParserT)
+import Parsing.Combinators (choice)
+import Parsing.DataView (takeN, match)
+import Parsing.String (anyChar, string)
 import Protobuf.Internal.Common (Bytes(..), WireType(..), FieldNumber)
 import Protobuf.Internal.Decode as Decode
 import Protobuf.Internal.Runtime (UnknownField(..))
-import Parsing (Position (..), ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT, getParserT)
-import Parsing.Combinators (choice)
-import Parsing.DataView (takeN)
-import Parsing.String (anyChar, string)
 import Web.DOM.Element (getAttribute)
 import Web.DOM.NodeList (toArray)
 import Web.DOM.ParentNode (QuerySelector(..), querySelectorAll)
+import Web.Encoding.TextDecoder (TextDecoder)
+import Web.Encoding.TextDecoder as TextDecoder
+import Web.Encoding.UtfLabel (utf8)
 import Web.HTML (HTMLElement, window)
 import Web.HTML.HTMLDocument (toParentNode)
 import Web.HTML.HTMLElement (fromNode, toElement)
@@ -108,17 +106,35 @@ renderMessage :: forall w i. Int -> Message -> HTML w i
 renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
   [ HH.tbody_ $ message <#> \(Tuple part field) ->
       HH.tr_ $ case field of
-        Scalar (UnknownBits32 fieldNumber value) ->
+        Scalar (UnknownBits32 fieldNumber (Bytes value)) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "32-bit"]
-          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ UInt.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "32-bit Value Interpretations"]
+            [ let
+                intEith = unsafePerformEffect $ runParserT (toView value) Decode.decodeUint32
+                fltEith = unsafePerformEffect $ runParserT (toView value) Decode.decodeFloat
+              in
+              HH.ul_
+              [ HH.li_ [ HH.text $ either (const "") UInt.toString intEith ]
+              , HH.li_ [ HH.text $ either (const "") show fltEith ]
+              ]
+            ]
           ]
-        Scalar (UnknownBits64 fieldNumber value) ->
+        Scalar (UnknownBits64 fieldNumber (Bytes value)) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "64-bit"]
-          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "Decimal Field Value"] [HH.text $ UInt64.toString value]
+          , HH.td [HP.class_ $ ClassName "fvalnumeric", HP.title "64-bit Value Interpretations"]
+            [ let
+                intEith = unsafePerformEffect $ runParserT (toView value) Decode.decodeUint64
+                fltEith = unsafePerformEffect $ runParserT (toView value) Decode.decodeDouble
+              in
+              HH.ul_
+              [ HH.li_ [ HH.text $ either (const "") UInt64.toString intEith ]
+              , HH.li_ [ HH.text $ either (const "") show fltEith ]
+              ]
+            ]
           ]
         Scalar (UnknownVarInt fieldNumber value) ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
@@ -131,19 +147,19 @@ renderMessage depth message = HH.table [ HP.class_ $ ClassName "messagetable" ]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
           , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text $ "Length-delimited"]
           , HH.td [HP.class_ $ ClassName "fvalbytes", HP.title "Field Value"]
-            [HH.text $ show value <>
+            [ HH.text
               ( unsafePerformEffect do
                   arr <- mkTypedArray $ toView $ unwrap value
                   try (TextDecoder.decode arr textdecoder) >>= case _ of
                     Right s -> pure $ " \"" <> s <> "\""
-                    Left _ -> pure $ " (Not UTF-8)"
+                    Left _ -> pure $ show value <> " (Not UTF-8)"
               )
             ]
           ]
         Nested fieldNumber nestedMessage ->
           [ HH.td [HP.class_ $ ClassName "bytes", HP.title "Hexadecimal Bytes"] [renderDataView part]
           , HH.td [HP.class_ $ ClassName "fnum", HP.title "Field Number"] [HH.text $ UInt.toString fieldNumber]
-          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Length-delimited Message"]
+          , HH.td [HP.class_ $ ClassName "ftype", HP.title "Field Type"] [HH.text "Message"]
           , HH.td [HP.class_ $ ClassName "fval"]
             [renderMessage (depth+1) nestedMessage]
             -- [ if depth < 15
@@ -169,7 +185,7 @@ handleAction = case _ of
 
 parseInput :: String -> Either String Message
 parseInput input = case fromOctString input of
-  Left (ParseError message position@(Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
+  Left (ParseError message (Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
   Right buf ->
     case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
       Left (ParseError message (Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
@@ -239,7 +255,7 @@ parseField parseMessage' = do
   Tuple fieldNumber wireType <- Decode.decodeTag32
   case wireType of
     VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.decodeUint64
-    Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Decode.decodeFixed64
+    Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Bytes <$> View <$> takeN 8
     LenDel -> do
       len <- UInt64.toInt <$> Decode.decodeVarint64
       case len of
@@ -249,7 +265,7 @@ parseField parseMessage' = do
           case (unsafePerformEffect (runParserT dv parseMessage')) of
             Right m -> pure $ Nested fieldNumber m
             Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $ Bytes $ View dv
-    Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Decode.decodeFixed32
+    Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Bytes <$> View <$> takeN 4
 
 mkTypedArray :: DataView -> Effect Uint8Array
 mkTypedArray dv = do
@@ -277,7 +293,7 @@ type Message = Array (Tuple DataView Field)
 awaitSelectAll
   :: { query :: QuerySelector, attr :: String }
   -> Aff (Array { element :: HTMLElement, attr :: String })
-awaitSelectAll ask@{ query } = HA.awaitLoad >>= \_ -> selectElements ask
+awaitSelectAll ask = HA.awaitLoad >>= \_ -> selectElements ask
 
 selectElements
   :: { query :: QuerySelector, attr :: String }
@@ -289,13 +305,3 @@ selectElements { query, attr } = do
     elems = fromMaybe [] <<< sequence $ fromNode <$> nodeArray
   attrs <- liftEffect $ traverse (getAttribute attr <<< toElement) elems
   pure $ zipWith ({ element: _, attr: _ }) elems (fromMaybe "" <$> attrs)
-
--- | ParserT DataView match combinator
-match :: forall a m. MonadEffect m => ParserT DataView m a -> ParserT DataView m (Tuple DataView a)
-match p = do
-  ParseState input (Position {index:index0}) _ <- getParserT
-  x <- p
-  ParseState _ (Position {index:index1}) _ <- getParserT
-  part <- lift $ liftEffect $ DV.part (DV.buffer input) (DV.byteOffset input + index0) (index1-index0)
-  pure $ Tuple part x
-

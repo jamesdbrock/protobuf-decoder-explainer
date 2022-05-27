@@ -29,7 +29,7 @@ module.exports = {
     stats: 'errors-only'
   },
 
-  entry: './index.js',
+  entry: './src/index.js',
 
   output: {
     path: path.resolve(__dirname, 'dist'),
