@@ -23,7 +23,6 @@
   , "prelude"
   , "strings"
   , "web-encoding"
-  , "transformers"
   , "tuples"
   , "uint"
   , "web-dom"

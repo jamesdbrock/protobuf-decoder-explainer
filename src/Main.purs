@@ -3,10 +3,8 @@ module Main where
 import Prelude
 
 import Control.Alt (alt)
-import Control.Lazy (fix)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (head, many, zipWith)
-import Data.ArrayBuffer.Builder (DataBuff(..), toView)
+import Data.ArrayBuffer.Builder (toView)
 import Data.ArrayBuffer.DataView as DV
 import Data.ArrayBuffer.Typed (buffer, fromArray)
 import Data.ArrayBuffer.Typed as AT
@@ -15,7 +13,7 @@ import Data.Char (toCharCode)
 import Data.Either (Either(..), either)
 import Data.Foldable (for_)
 import Data.Int (hexadecimal, toStringAs)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits as Char
 import Data.Traversable (sequence, traverse)
@@ -25,10 +23,10 @@ import Data.UInt as UInt
 import Data.UInt64 as UInt64
 import Effect (Effect)
 import Effect.Aff (Aff)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (liftEffect)
 import Effect.Exception (try)
 import Effect.Unsafe (unsafePerformEffect)
-import Halogen (ClassName(..))
+import Halogen (ClassName(..), lift)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML (HTML)
@@ -36,13 +34,14 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import Parsing (Position(..), ParseError(..), ParseState(..), Parser, ParserT, fail, runParser, runParserT, getParserT)
+import Parsing (ParseError(..), Parser, ParserT, Position(..), fail, runParser, runParserT)
 import Parsing.Combinators (choice)
-import Parsing.DataView (takeN, match)
+import Parsing.DataView (match)
 import Parsing.String (anyChar, string)
-import Protobuf.Internal.Common (Bytes(..), WireType(..), FieldNumber)
+import Protobuf.Internal.Common (Bytes(..), FieldNumber, manyArray)
 import Protobuf.Internal.Decode as Decode
 import Protobuf.Internal.Runtime (UnknownField(..))
+import Protobuf.Library (parseAnyField)
 import Web.DOM.Element (getAttribute)
 import Web.DOM.NodeList (toArray)
 import Web.DOM.ParentNode (QuerySelector(..), querySelectorAll)
@@ -187,7 +186,7 @@ parseInput :: String -> Either String Message
 parseInput input = case fromOctString input of
   Left (ParseError message (Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
   Right buf ->
-    case unsafePerformEffect $ runParserT (DV.whole buf) $ fix $ \p -> parseMessage p of
+    case unsafePerformEffect $ runParserT (DV.whole buf) $ parseMessage of
       Left (ParseError message (Position {index})) -> Left $ "Parse failure at byte offset " <> show index <> ": " <> message
       Right message -> Right message
 
@@ -246,26 +245,14 @@ parseOctalDigit = anyChar >>= case _ of
   '7' -> pure 7
   x   -> fail $ "Expecting octal digit but got " <> Char.singleton x
 
--- See https://github.com/Thimoteus/SandScript/wiki/2.-Parsing-recursively
-parseMessage :: ParserT DataView Effect Message -> ParserT DataView Effect Message
-parseMessage recurse = many $ match $ parseField recurse
-
-parseField :: ParserT DataView Effect Message -> ParserT DataView Effect Field
-parseField parseMessage' = do
-  Tuple fieldNumber wireType <- Decode.decodeTag32
-  case wireType of
-    VarInt -> Scalar <$> UnknownVarInt fieldNumber <$> Decode.decodeUint64
-    Bits64 -> Scalar <$> UnknownBits64 fieldNumber <$> Bytes <$> View <$> takeN 8
-    LenDel -> do
-      len <- UInt64.toInt <$> Decode.decodeVarint64
-      case len of
-        Nothing -> fail "Length-delimited value of unknown field was too long."
-        Just l -> do
-          dv <- takeN l
-          case (unsafePerformEffect (runParserT dv parseMessage')) of
-            Right m -> pure $ Nested fieldNumber m
-            Left _ -> pure $ Scalar <$> UnknownLenDel fieldNumber $ Bytes $ View dv
-    Bits32 -> Scalar <$> UnknownBits32 fieldNumber <$> Bytes <$> View <$> takeN 4
+parseMessage :: ParserT DataView Effect Message
+parseMessage = manyArray $ match do
+  parseAnyField >>= case _ of
+    field@(UnknownLenDel fieldNumber (Bytes buf)) -> do
+      lift (runParserT (toView buf) parseMessage) >>= case _ of
+        Right m -> pure $ Nested fieldNumber m
+        Left _ -> pure $ Scalar field
+    x -> pure $ Scalar x
 
 mkTypedArray :: DataView -> Effect Uint8Array
 mkTypedArray dv = do

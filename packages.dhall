@@ -123,7 +123,7 @@ let upstream =
 let overrides =
       { protobuf =
         { repo = "https://github.com/xc-jp/purescript-protobuf.git"
-        , version = "7bdc015aaec72fcf9a5bc7c1ac6e37f59f6c129f"
+        , version = "8d0079045f44d6e73ccc92a4a562ac39e3639e28"
         , dependencies =
           [ "arraybuffer"
           , "arraybuffer-builder"
